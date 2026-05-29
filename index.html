@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Toilet-Fight</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; touch-action: none; display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw; user-select: none; -webkit-user-select: none; }
+        #game-container { position: relative; width: 100%; max-width: 450px; height: 100%; max-height: 900px; background: #222; overflow: hidden; border: 2px solid #333; cursor: crosshair; touch-action: none; }
+        #menu, #game-over, #pause-menu, #shop-menu, #agents-menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; justify-content: center; align-items: center; background: #000; color: white; z-index: 100; }
+        #menu { display: flex; }
+        button { padding: 15px 30px; margin: 5px; font-size: 18px; cursor: pointer; }
+        #hud { position: absolute; top: 15px; left: 15px; color: white; font-size: 20px; font-weight: bold; z-index: 50; pointer-events: none; }
+        #pause-btn { position: absolute; top: 15px; right: 15px; padding: 8px 15px; z-index: 60; cursor: pointer; }
+        #ui { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 50; pointer-events: none; }
+        #attack-btn { width: 100px; height: 100px; background: #ff0000; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; border: 4px solid white; cursor: pointer; font-size: 18px; transition: opacity 0.3s; pointer-events: auto; }
+        #attack-btn.cooldown { opacity: 0.3; pointer-events: none; }
+        .upgrade-panel { display: flex; gap: 10px; margin-bottom: 20px; }
+        .upg-box { text-align: center; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 10px; }
+        #menu-chips { font-size: 24px; margin-bottom: 20px; color: #ff0; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="hud">
+        <div id="hp-display">HP: 10</div>
+        <div id="chips-display">Чипы: 0</div>
+        <div id="kill-display">Убито: 0</div>
+    </div>
+    <button id="pause-btn">ПАУЗА</button>
+
+    <div id="menu">
+        <h1>Toilet-Fight</h1>
+        <div id="menu-chips">Чипы: 0</div>
+        <div id="agent-display" style="margin-bottom: 10px; color: #00ffcc;">Агент: Камера-Мен</div>
+        <div class="upgrade-panel">
+            <div class="upg-box">УРОН: <span id="dmg-lvl">0</span><br><button onclick="window.upgrade('dmg')">250</button></div>
+            <div class="upg-box">HP: <span id="hp-lvl">0</span><br><button onclick="window.upgrade('hp')">200</button></div>
+        </div>
+        <button id="startBtn">ИГРАТЬ</button>
+        <button id="shopBtn">МАГАЗИН</button>
+        <button id="agentsBtn">АГЕНТЫ</button>
+    </div>
+
+    <div id="shop-menu">
+        <h1>МАГАЗИН</h1>
+        <button id="buySpeakerBtn">СПИКЕР-МЕН (150)</button>
+        <button onclick="document.getElementById('shop-menu').style.display='none'; document.getElementById('menu').style.display='flex'">НАЗАД</button>
+    </div>
+
+    <div id="agents-menu">
+        <h1>АГЕНТЫ</h1>
+        <button onclick="window.setAgent('camera')">КАМЕРА-МЕН</button>
+        <button id="speakerBtn" style="display:none;" onclick="window.setAgent('speaker')">СПИКЕР-МЕН</button>
+        <button onclick="document.getElementById('agents-menu').style.display='none'; document.getElementById('menu').style.display='flex'">НАЗАД</button>
+    </div>
+
+    <div id="pause-menu">
+        <h1>ПАУЗА</h1>
+        <button id="resumeBtn">ПРОДОЛЖИТЬ</button>
+        <button onclick="location.reload()">ВЫХОД</button>
+    </div>
+
+    <div id="game-over">
+        <h1>ВЫ ПРОИГРАЛИ</h1>
+        <button onclick="location.reload()">В МЕНЮ</button>
+    </div>
+
+    <div id="ui"><div id="attack-btn">УДАР</div></div>
+</div>
+
+<script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
+<script type="module">
+    import * as THREE from 'three';
+    const container = document.getElementById('game-container');
+    const loader = new THREE.TextureLoader();
+    let scene, camera, renderer, player, enemies = [], medkit = null;
+    let isPlaying = false, isPaused = false, isMouseDown = false, velocityY = 0;
+    let playerHP = 10, lastDamageTime = 0, attackCooldown = false, lastMedkitTime = 0;
+    
+    let chips = parseInt(localStorage.getItem('savedChips')) || 0;
+    let killCount = parseInt(localStorage.getItem('savedKills')) || 0;
+    let dmgLvl = parseInt(localStorage.getItem('savedDmgLvl')) || 0;
+    let hpLvl = parseInt(localStorage.getItem('savedHpLvl')) || 0;
+    let hasSpeaker = localStorage.getItem('hasSpeaker') === 'true';
+    let activeAgent = localStorage.getItem('activeAgent') || 'camera';
+
+    function saveProgress() {
+        localStorage.setItem('savedChips', chips);
+        localStorage.setItem('savedKills', killCount);
+        localStorage.setItem('savedDmgLvl', dmgLvl);
+        localStorage.setItem('savedHpLvl', hpLvl);
+        localStorage.setItem('hasSpeaker', hasSpeaker);
+        localStorage.setItem('activeAgent', activeAgent);
+    }
+
+    function updateDisplay() {
+        document.getElementById('chips-display').innerText = "Чипы: " + chips;
+        document.getElementById('menu-chips').innerText = "Чипы: " + chips;
+        document.getElementById('kill-display').innerText = "Убито: " + killCount;
+        document.getElementById('dmg-lvl').innerText = dmgLvl;
+        document.getElementById('hp-lvl').innerText = hpLvl;
+        document.getElementById('agent-display').innerText = "Агент: " + (activeAgent === 'speaker' ? "Спикер-Мен" : "Камера-Мен");
+        if(hasSpeaker) document.getElementById('speakerBtn').style.display = 'block';
+        saveProgress();
+    }
+
+    const pressedKeys = new Set();
+    let camRot = { theta: 0, phi: 0.8 }, camDist = 12;
+    let moveDir = new THREE.Vector2(0, 0); // Вектор направления движения (для тача)
+
+    window.upgrade = (type) => {
+        if (type === 'dmg' && chips >= 250) { chips -= 250; dmgLvl++; document.getElementById('dmg-lvl').innerText = dmgLvl; }
+        else if (type === 'hp' && chips >= 200) { chips -= 200; hpLvl++; playerHP += 5; document.getElementById('hp-lvl').innerText = hpLvl; document.getElementById('hp-display').innerText = "HP: " + playerHP; }
+        updateDisplay();
+    };
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+    camera = new THREE.PerspectiveCamera(75, container.clientWidth/container.clientHeight, 0.1, 1000);
+    renderer = new THREE.WebGLRenderer({antialias: true});
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(renderer.domElement);
+    scene.add(new THREE.AmbientLight(0xffffff, 1));
+
+    const createTex = (url, rx, ry) => { const t = loader.load(url); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); return t; };
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshBasicMaterial({ map: createTex('grass.png', 20, 20) }));
+    floor.rotation.x = -Math.PI / 2; scene.add(floor);
+
+    const wallBoundaries = [{x:0, z:50, w:100, d:2, rx: 20}, {x:0, z:-50, w:100, d:2, rx: 20}, {x:50, z:0, w:2, d:100, rx: 20}, {x:-50, z:0, w:2, d:100, rx: 20}];
+    wallBoundaries.forEach(b => {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(b.w, 12, b.d), new THREE.MeshBasicMaterial({ map: createTex('walls.jpg', b.rx, 1) }));
+        wall.position.set(b.x, 6, b.z); scene.add(wall);
+    });
+
+    player = new THREE.Mesh(new THREE.PlaneGeometry(2, 2.5), new THREE.MeshBasicMaterial({ transparent: true, alphaTest: 0.5, side: THREE.DoubleSide }));
+    
+    window.setAgent = (type) => {
+        activeAgent = type;
+        if(type === 'speaker') { player.material.map = loader.load('spiker.png'); }
+        else { player.material.map = loader.load('Kamera-Men.png'); }
+        player.scale.set(1, 1, 1);
+        updateDisplay();
+    };
+    
+    window.setAgent(activeAgent);
+    player.position.set(0, 1.25, 0); scene.add(player);
+
+    function spawnEnemy() {
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 3.5), new THREE.MeshBasicMaterial({ map: loader.load('Skibidi.png'), transparent: true, alphaTest: 0.5, side: THREE.DoubleSide }));
+        mesh.position.set((Math.random()-0.5)*80, 1.75, (Math.random()-0.5)*80);
+        scene.add(mesh); enemies.push({ mesh, hp: 3 });
+    }
+
+    document.getElementById('startBtn').onclick = () => { document.getElementById('menu').style.display='none'; isPlaying=true; for(let i=0; i<3; i++) spawnEnemy(); };
+    document.getElementById('shopBtn').onclick = () => { document.getElementById('menu').style.display='none'; document.getElementById('shop-menu').style.display='flex'; };
+    document.getElementById('agentsBtn').onclick = () => { document.getElementById('menu').style.display='none'; document.getElementById('agents-menu').style.display='flex'; };
+    document.getElementById('buySpeakerBtn').onclick = () => { if(chips >= 150) { chips -= 150; hasSpeaker = true; updateDisplay(); document.getElementById('speakerBtn').style.display='block'; } };
+    document.getElementById('pause-btn').onclick = () => { isPaused=true; document.getElementById('pause-menu').style.display='flex'; };
+    document.getElementById('resumeBtn').onclick = () => { isPaused=false; document.getElementById('pause-menu').style.display='none'; };
+
+    // ИСПРАВЛЕННОЕ УПРАВЛЕНИЕ: МУЛЬТИТАЧ
+    const activeTouches = new Map();
+    const joystickRadius = 50;
+    
+    container.addEventListener('pointerdown', (e) => {
+        activeTouches.set(e.pointerId, { startX: e.clientX, startY: e.clientY, curX: e.clientX, curY: e.clientY });
+    });
+
+    container.addEventListener('pointermove', (e) => {
+        if (!activeTouches.has(e.pointerId)) return;
+        const t = activeTouches.get(e.pointerId);
+        
+        if (t.startY > window.innerHeight / 2) { // Зона движения
+            let dx = e.clientX - t.startX;
+            let dy = e.clientY - t.startY;
+            let len = Math.sqrt(dx*dx + dy*dy);
+            if (len > 10) {
+                moveDir.set(dx/len, dy/len);
+            }
+        } else { // Зона камеры
+            camRot.theta -= (e.clientX - t.curX) * 0.005;
+            camRot.phi = Math.max(0.3, Math.min(1.2, camRot.phi + (e.clientY - t.curY) * 0.005));
+        }
+        t.curX = e.clientX; t.curY = e.clientY;
+    });
+
+    container.addEventListener('pointerup', (e) => {
+        const t = activeTouches.get(e.pointerId);
+        if (t && t.startY > window.innerHeight / 2) moveDir.set(0, 0);
+        activeTouches.delete(e.pointerId);
+    });
+
+    window.onkeydown = (e) => { pressedKeys.add(e.code); if (e.code === 'Space' && player.position.y <= 1.26) velocityY = 0.25; };
+    window.onkeyup = (e) => pressedKeys.delete(e.code);
+    window.onmousedown = (e) => { e.preventDefault(); isMouseDown = true; };
+    window.onmouseup = () => isMouseDown = false;
+    window.onmousemove = (e) => { if(isMouseDown) { camRot.theta -= e.movementX * 0.005; camRot.phi = Math.max(0.3, Math.min(1.2, camRot.phi + e.movementY * 0.005)); }};
+    window.onwheel = (e) => camDist = Math.max(5, Math.min(25, camDist + e.deltaY * 0.01));
+
+    document.getElementById('attack-btn').onclick = () => {
+        if(attackCooldown || !isPlaying || isPaused) return;
+        enemies.forEach((e, i) => {
+            if(e.mesh.position.distanceTo(player.position) < 5) {
+                e.hp -= (1 + dmgLvl);
+                if(e.hp <= 0) { scene.remove(e.mesh); enemies.splice(i, 1); chips += 10; killCount++; if(killCount % 10 === 0) chips += 100; updateDisplay(); document.getElementById('kill-display').innerText="Убито: "+killCount; spawnEnemy(); }
+            }
+        });
+        attackCooldown = true; setTimeout(() => { attackCooldown = false; document.getElementById('attack-btn').classList.remove('cooldown'); }, 1000);
+        document.getElementById('attack-btn').classList.add('cooldown');
+    };
+
+    function animate(time) {
+        requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+        if(!isPlaying || isPaused) return;
+        
+        if(time - lastMedkitTime > 15000) { if(!medkit) { const m = new THREE.Mesh(new THREE.PlaneGeometry(2,2), new THREE.MeshBasicMaterial({map:loader.load('aptechka.png'), transparent:true, alphaTest:0.5, side:THREE.DoubleSide})); m.position.set((Math.random()-0.5)*80, 1, (Math.random()-0.5)*80); scene.add(m); medkit = m; } lastMedkitTime = time; }
+        if(medkit) { medkit.lookAt(camera.position.x, medkit.position.y, camera.position.z); if(player.position.distanceTo(medkit.position) < 2) { playerHP = Math.min(10+hpLvl*5, playerHP + 2); document.getElementById('hp-display').innerText = "HP: " + playerHP; scene.remove(medkit); medkit = null; } }
+        
+        velocityY -= 0.012; player.position.y += velocityY; if(player.position.y < 1.25) { player.position.y = 1.25; velocityY = 0; }
+        
+        let move = new THREE.Vector3(0,0,0);
+        // Добавляем WASD
+        if(pressedKeys.has('KeyW')) move.z -= 0.15; if(pressedKeys.has('KeyS')) move.z += 0.15; if(pressedKeys.has('KeyA')) move.x -= 0.15; if(pressedKeys.has('KeyD')) move.x += 0.15;
+        // Добавляем Touch Joystick
+        move.x += moveDir.x * 0.15; move.z += moveDir.y * 0.15;
+        
+        let moveWorld = move.applyAxisAngle(new THREE.Vector3(0,1,0), camRot.theta);
+        let nextPos = player.position.clone().add(moveWorld);
+        if(!wallBoundaries.some(b => Math.abs(nextPos.x - b.x) < (b.w/2 + 1) && Math.abs(nextPos.z - b.z) < (b.d/2 + 1))) { player.position.x = nextPos.x; player.position.z = nextPos.z; }
+        
+        player.lookAt(camera.position.x, player.position.y, camera.position.z);
+        
+        let targetCamPos = new THREE.Vector3(player.position.x + camDist*Math.sin(camRot.theta)*Math.cos(camRot.phi), player.position.y+2+camDist*Math.sin(camRot.phi), player.position.z + camDist*Math.cos(camRot.theta)*Math.cos(camRot.phi));
+        camera.position.lerp(targetCamPos, 0.2);
+        camera.lookAt(player.position.x, player.position.y + 1, player.position.z);
+        
+        enemies.forEach(e => {
+            e.mesh.lookAt(camera.position.x, e.mesh.position.y, camera.position.z);
+            let dir = player.position.clone().sub(e.mesh.position).normalize().multiplyScalar(0.02);
+            e.mesh.position.add(dir); e.mesh.position.y = 1.75;
+            if(e.mesh.position.distanceTo(player.position) < 2.5 && time - lastDamageTime > 2000 && Math.random() < 0.1) { playerHP--; document.getElementById('hp-display').innerText="HP: "+playerHP; lastDamageTime=time; if(playerHP <= 0) document.getElementById('game-over').style.display='flex'; }
+        });
+    }
+    animate();
+    updateDisplay();
+</script>
+</body>
+</html>
