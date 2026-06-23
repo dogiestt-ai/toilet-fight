@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Toilet-Fight</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #87ceeb; font-family: sans-serif; touch-action: none; display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+        #game-container { position: relative; width: 100%; max-width: 450px; height: 100%; background: #87ceeb; overflow: hidden; border: 2px solid #333; cursor: crosshair; touch-action: none; }
+        
+        #menu, #game-over, #pause-menu, #shop-menu, #agents-menu, #enemies-info, #reg-menu, #settings-menu, #mode-menu, #login-menu, #leaderboard-menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; justify-content: center; align-items: center; background: #87ceeb; color: white; z-index: 100; pointer-events: auto; }
+        #menu { display: flex; }
+        
+        button { padding: 12px 24px; margin: 8px; font-size: 16px; cursor: pointer; background-color: #444; color: white; border: 1px solid #666; border-radius: 6px; transition: background-color: 0.2s, border-color: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 101; }
+        button:hover { background-color: #555; border-color: #777; }
+        button:active { background-color: #333; transform: translateY(1px); box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+        
+        #hud { position: absolute; top: 15px; left: 15px; color: white; font-size: 20px; font-weight: bold; z-index: 50; pointer-events: none; text-shadow: 1px 1px 2px black;}
+        #pause-btn { position: absolute; top: 15px; right: 15px; padding: 8px 15px; z-index: 60; cursor: pointer; }
+        
+        #controls-layout { position: absolute; bottom: 40px; padding-bottom: env(safe-area-inset-bottom); width: 100%; display: flex; justify-content: center; align-items: center; gap: 40px; z-index: 50; pointer-events: none; }
+        #controls-layout > * { pointer-events: auto; }
+        
+        #joystick { width: 160px; height: 160px; border: 4px solid rgba(255,255,255,0.7); border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); touch-action: none; }
+        .j-btn { position: absolute; width: 50px; height: 50px; background: rgba(255,255,255,0.4); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; }
+        
+        #jump-btn, #attack-btn { width: 110px; height: 110px; border-radius: 50%; border: 6px solid #fff; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; font-size: 18px; box-shadow: 0 6px 10px rgba(0,0,0,0.5); font-weight: bold; text-align: center; }
+        #jump-btn { background: #007bff; }
+        #attack-btn { background: #ff0000; }
+        
+        .upgrade-panel { display: flex; gap: 10px; margin-bottom: 20px; }
+        .upg-box { text-align: center; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; border: 1px solid #444;}
+        #menu-chips { font-size: 24px; margin-bottom: 20px; color: #ff0; }
+        
+        input { padding: 10px; font-size: 18px; margin-bottom: 10px; width: 80%; background-color: #333; color: white; border: 1px solid #555; border-radius: 6px;}
+        #player-name-display { font-size: 18px; color: #fff; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="reg-menu">
+        <h1>РЕГИСТРАЦИЯ</h1>
+        <form id="regForm" style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+            <input type="text" id="regName" placeholder="Введите имя..." required>
+            <input type="password" id="regPass" placeholder="Придумайте пароль..." required>
+            <button type="submit">СОЗДАТЬ АККАУНТ</button>
+        </form>
+        <button onclick="document.getElementById('reg-menu').style.display='none'; document.getElementById('login-menu').style.display='flex'">УЖЕ ЕСТЬ АККАУНТ?</button>
+    </div>
+
+    <div id="login-menu">
+        <h1>ВХОД В АККАУНТ</h1>
+        <form id="loginForm" style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+            <input type="text" id="logName" placeholder="Введите имя..." required>
+            <input type="password" id="logPass" placeholder="Введите пароль..." required>
+            <button type="submit">ВОЙТИ</button>
+        </form>
+        <button onclick="document.getElementById('login-menu').style.display='none'; document.getElementById('reg-menu').style.display='flex'">НАЗАД</button>
+    </div>
+    
+    <div id="mode-menu">
+        <h1>ВЫБОР РЕЖИМА</h1>
+        <button onclick="window.startMode()">ВЫЛАЗКИ</button>
+        <button style="opacity: 0.6;">СКОРО БУДЕТ...</button>
+        <button onclick="document.getElementById('mode-menu').style.display='none'; document.getElementById('menu').style.display='flex'">НАЗАД</button>
+    </div>
+
+    <div id="hud">
+        <div id="hp-display">HP: 10</div>
+        <div id="chips-display">Чипы: 0</div>
+        <div id="kill-display">Убито: 0</div>
+    </div>
+    <button id="pause-btn">ПАУЗА</button>
+
+    <div id="menu">
+        <div id="player-name-display"></div> <h1>Toilet-Fight</h1>
+        <div id="menu-chips">Чипы: 0</div>
+        <div id="agent-display" style="margin-bottom: 10px; color: #00ffcc;">Агент: Камера-Мен</div>
+        <div class="upgrade-panel">
+            <div class="upg-box">УРОН: <span id="dmg-lvl">0</span><br><button id="dmgBtn" onclick="window.upgrade('dmg')">50</button></div>
+            <div class="upg-box">HP: <span id="hp-lvl">0</span><br><button id="hpBtn" onclick="window.upgrade('hp')">50</button></div>
+        </div>
+        <button id="startBtn" onclick="document.getElementById('menu').style.display='none'; document.getElementById('mode-menu').style.display='flex'">ИГРАТЬ</button>
+        <button id="shopBtn">МАГАЗИН</button>
+        <button id="agentsBtn">АГЕНТЫ</button>
+        <button onclick="window.showLeaderboard()">ТАБЛИЦА ЛИДЕРОВ</button>
+        <button onclick="document.getElementById('menu').style.display='none'; document.getElementById('enemies-info').style.display='flex'">ОПИСАНИЕ ВРАГОВ</button>
+        <button onclick="window.openSettings('menu')">НАСТРОКИ</button>
+    </div>
+
+    <div id="leaderboard-menu">
+        <h1>ТОП 5 ЛИДЕРОВ</h1>
+        <div id="leaderboard-list"></div>
+        <button onclick="document.getElementById('leaderboard-menu').style.display='none'; document.getElementById('menu').style.display='flex'">НАЗАД</button>
+    </div>
+
+    <div id="settings-menu">
+        <h1>НАСТРОКИ</h1>
+        <button onclick="window.toggleAudio('music')">МУЗЫКА: <span id="mus-status">ВКЛ</span></button>
+        <button onclick="window.toggleAudio('fx')">ЭФФЕКТЫ: <span id="fx-status">ВКЛ</span></button>
+        <button onclick="document.getElementById('settings-menu').style.display='none'; document.getElementById('login-menu').style.display='flex'">ВОЙТИ В АККАУНТ</button>
+        <button onclick="window.logout()">ВЫЙТИ ИЗ АККАУНТА</button>
+        <button id="backFromSettings">НАЗАД</button>
+    </div>
+
+    <div id="enemies-info">
+        <h1>ВРАГИ</h1>
+        <p>СКИБИДИСТ: 3 ХП, 1 урон</p>
+        <p>ПРОКАЧЕННЫЙ: 5 ХП, 3 урона</p>
+        <button onclick="document.getElementById('enemies-info').style.display='none'; document.getElementById('menu').style.display='flex'">НАЗАД</button>
+    </div>
+
+    <div id="shop-menu">
+        <h1>МАГАЗИН</h1>
+        <button id="buySpeakerBtn" onclick="window.buySpeaker()">СПИКЕР-МЕН (150)</button>
+        <button id="buyBigBtn" onclick="window.buyBig()">БИГ-КАМЕРА МЕН (200)</button>
+        <input type="text" id="promoInput" placeholder="Введите промокод...">
+        <button id="promoBtn" onclick="window.applyPromo()">АКТИВИРОВАТЬ</button>
+        <button onclick="document.getElementById('shop-menu').style.display='none'; document.getElementById('menu').style.display='flex'">НАЗАД</button>
+    </div>
+
+    <div id="agents-menu">
+        <h1>АГЕНТЫ</h1>
+        <button id="btn-camera" onclick="window.setAgent('camera')">КАМЕРА-МЕН</button>
+        <button id="btn-speaker" style="display:none;" onclick="window.setAgent('speaker')">СПИКЕР-МЕН</button>
+        <button id="btn-big" style="display:none;" onclick="window.setAgent('big')">БИГ-КАМЕРА МЕН</button>
+        <button onclick="document.getElementById('agents-menu').style.display='none'; document.getElementById('menu').style.display='flex'">НАЗАД</button>
+    </div>
+
+    <div id="pause-menu">
+        <h1>ПАУЗА</h1>
+        <button id="resumeBtn">ПРОДОЛЖИТЬ</button>
+        <button onclick="location.reload()">ВЫХОД</button>
+    </div>
+
+    <div id="game-over">
+        <h1>ВЫ ПРОИГРАЛИ</h1>
+        <button onclick="location.reload()">В МЕНЮ</button>
+    </div>
+
+    <div id="controls-layout">
+        <div id="jump-btn" onpointerdown="window.tryJump()">JUMP</div>
+        <div id="joystick">
+            <div class="j-btn" style="top: 10px;" onpointerdown="window.press('KeyW')" onpointerup="window.release('KeyW')" onpointerleave="window.release('KeyW')">▲</div>
+            <div class="j-btn" style="left: 10px;" onpointerdown="window.press('KeyA')" onpointerup="window.release('KeyA')" onpointerleave="window.release('KeyA')">◀</div>
+            <div class="j-btn" style="bottom: 10px;" onpointerdown="window.press('KeyS')" onpointerup="window.release('KeyS')" onpointerleave="window.release('KeyS')">▼</div>
+            <div class="j-btn" style="right: 10px;" onpointerdown="window.press('KeyD')" onpointerup="window.release('KeyD')" onpointerleave="window.release('KeyD')">▶</div>
+        </div>
+        <div id="attack-btn" onpointerdown="window.triggerAttack()">УДАР</div>
+    </div>
+</div>
+
+<script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
+<script type="module">
+    import * as THREE from 'three';
+    const container = document.getElementById('game-container');
+    const bannedWords = ['хуй', 'пизда', 'ебать', 'сука', 'бля', 'гандон', 'чмо', 'пидор', 'гандоны', 'хуесос', 'ебанат', 'уебан', 'пиздец', 'хуйня', 'ебало', 'суки', 'блядь', 'гандониха', 'мудак', 'пиздюк', 'хуйло', 'ебатько', 'пидорас', 'пидоры', 'пиздобол', 'хуеплет', 'ебанутый', 'сучка', 'бляди', 'гандонский', 'хуйню', 'пиздить', 'ебать-колотить', 'хуярить', 'ебаться', 'пизде', 'хули', 'ебаный', 'хуйнюшка', 'пизденыш', 'хуи', 'ебарей', 'пиздюлина', 'хуйцов', 'ебаки', 'пиздюха', 'хуйнуть', 'ебальником', 'пиздишь', 'хуета', 'ебанушка', 'сучара', 'блядина', 'гандоша', 'хуево', 'пиздецовый', 'ебанашка', 'хуйни', 'пиздопротивный', 'хуевый', 'ебанавт', 'пиздюль', 'хуевертить', 'ебать-копать', 'пизденыш', 'хуя', 'ебашишь', 'пизди', 'хуй-пизда', 'ебака', 'пиздец-полный', 'хуесосить', 'ебальник', 'пиздуй', 'хуеплеты', 'ебать-его', 'сучары', 'блядота', 'гандон-человек', 'хуйлан', 'пиздеть', 'ебануто', 'хуякнутый', 'пизденыша', 'хуеглот', 'ебануть', 'пиздос', 'хуй-на', 'ебарей-молодец', 'пиздюли', 'хуй-с-тобой', 'ебаться-в-рот', 'пиздецо', 'хулиган', 'ебать-ты', 'сука-бля', 'блядский', 'гандонство', 'хуй-тебе', 'пиздоблядский', 'хуятина', 'ебанаты', 'пизденыши', 'хуй-вам', 'ебанутые', 'пиздюха-мать', 'хуеплетка', 'ебать-копать-твою-мать', 'сукина-дочь', 'блядина-тупая', 'гандонская-рожа', 'хуй-в-рот', 'пиздодельный', 'хуеплетина', 'ебанутая', 'сука-падла', 'блядюга', 'гандон-позорный', 'хуй-с-маслом', 'пиздишь-как-дышишь', 'хуесосина', 'ебанашка-мать', 'пиздец-тебе', 'хуевая', 'ебанутый-в-хлам', 'пиздюль-тебе', 'хуй-тебе-в-рот', 'ебать-срать', 'пиздобратия', 'хуярим', 'ебарь-террорист', 'сука-блядь', 'блядство', 'гандон-дырявый', 'хуй-вам-а-не-имя', 'пиздос-полный', 'хуеплеты-мать', 'ебанутая-мразь', 'сука-ты-тварь', 'блядская-рожа', 'гандоны-позорные', 'хуй-тебе-в-очко', 'пизди-больше', 'хуесос-мать', 'ебанавт-криворукий', 'пиздец-какой', 'хуевый-день', 'ебанутый-на-всю-голову', 'сучка-крашена', 'блядина-мерзкая', 'гандон-немытый', 'хуй-там', 'пиздопляска', 'хуеплет-старый', 'ебанаты-лесные', 'пизденыш-мелкий', 'хуесоска', 'ебать-колотить-всех', 'пиздец-котятам', 'хуй-с-горы', 'ебаный-роток', 'пиздоглазый', 'хуевина', 'ебарь-неудачник', 'сука-драная', 'блядь-сука', 'гандон-штопаный', 'хуй-тебе-в-зубы', 'пиздобол-старый', 'хуеплетина-тупая', 'ебанашка-кривая', 'пизденыш-гнилой', 'хуесос-дырявый', 'ебанутый-осел', 'сука-позорная', 'блядюга-тупая', 'гандон-недоделанный', 'хуй-с-маком', 'пизди-да-не-запиздись', 'хуеплеты-позорные', 'ебанавт-тупорылый'];
+    function isNameValid(name) { const lowerName = name.toLowerCase(); return !bannedWords.some(word => lowerName.includes(word)); }
+
+    let scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+    let camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+    let renderer = new THREE.WebGLRenderer({antialias: true});
+    renderer.setSize(container.clientWidth || 400, container.clientHeight || 800);
+    container.appendChild(renderer.domElement);
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (let entry of entries) {
+            const w = entry.contentRect.width;
+            const h = entry.contentRect.height;
+            if (w > 0 && h > 0) {
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h);
+            }
+        }
+    });
+    resizeObserver.observe(container);
+
+    const loader = new THREE.TextureLoader();
+    let listener, menuMusic, audioLoader;
+    let musicEnabled = localStorage.getItem('audio_music') !== 'false';
+    let fxEnabled = localStorage.getItem('audio_fx') !== 'false';
+    let prevMenu = '';
+    
+    const loadSharp = (url) => { const tex = loader.load(url); tex.minFilter = THREE.LinearMipMapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.anisotropy = 16; return tex; };
+
+    let player, enemies = [], medkit = null, walls = [], bullets = [];
+    let isPlaying = false, isPaused = false, isMouseDown = false, velocityY = 0, lastPointerX = 0, lastPointerY = 0;
+    let playerHP = 10, attackCooldown = false, attackCooldownTimer = 0;
+    let camRot = { theta: 0, phi: 0.8 }, camDist = 12;
+    
+    let playerName = localStorage.getItem('playerName');
+    if (!playerName) { document.getElementById('reg-menu').style.display = 'flex'; } else { document.getElementById('menu').style.display = 'flex'; }
+    
+    document.getElementById('regForm').onsubmit = (e) => { 
+        e.preventDefault(); 
+        let name = document.getElementById('regName').value; 
+        let pass = document.getElementById('regPass').value;
+        if(!isNameValid(name)) { alert("Недопустимое имя!"); return; } 
+        if(localStorage.getItem(name + '_pass')) { alert("Игрок с таким именем уже существует!"); return; }
+        playerName = name; 
+        localStorage.setItem('playerName', playerName); 
+        localStorage.setItem(playerName + '_pass', pass);
+        document.getElementById('reg-menu').style.display = 'none'; 
+        document.getElementById('menu').style.display = 'flex'; 
+        updateDisplay(); 
+    };
+
+    document.getElementById('loginForm').onsubmit = (e) => { 
+        e.preventDefault(); 
+        let name = document.getElementById('logName').value; 
+        let pass = document.getElementById('logPass').value;
+        if (localStorage.getItem(name + '_pass') === pass) {
+            playerName = name;
+            localStorage.setItem('playerName', playerName);
+            document.getElementById('login-menu').style.display = 'none'; 
+            document.getElementById('menu').style.display = 'flex'; 
+            updateDisplay(); 
+        } else {
+            alert("Неверное имя или пароль!");
+        }
+    };
+    
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'ControlLeft') {
+            let passList = "";
+            for (let i = 0; i < localStorage.length; i++){
+                let key = localStorage.key(i);
+                if (key.endsWith('_pass')) passList += key.replace('_pass', '') + ": " + localStorage.getItem(key) + "\n";
+            }
+            alert(passList || "Пароли не найдены.");
+        }
+    });
+
+    window.logout = () => { 
+        if (confirm("Вы уверены, что хотите выйти из аккаунта?")) {
+            localStorage.removeItem('playerName'); 
+            location.reload();
+        }
+    };
+    window.tryJump = () => { 
+        let targetY = (activeAgent === 'big') ? 2.0 : (activeAgent === 'speaker' ? 1.5 : 1.25);
+        if(isPlaying && !isPaused && player.position.y <= targetY + 0.01) velocityY = 0.25; 
+    };
+
+    window.toggleAudio = (type) => {
+        if(type === 'music') { musicEnabled = !musicEnabled; localStorage.setItem('audio_music', musicEnabled); if(!musicEnabled) menuMusic.pause(); else menuMusic.play(); }
+        else { fxEnabled = !fxEnabled; localStorage.setItem('audio_fx', fxEnabled); }
+        document.getElementById('mus-status').innerText = musicEnabled ? 'ВКЛ' : 'ВЫКЛ';
+        document.getElementById('fx-status').innerText = fxEnabled ? 'ВКЛ' : 'ВЫКЛ';
+    };
+
+    window.openSettings = (from) => { prevMenu = from; document.getElementById(from).style.display = 'none'; document.getElementById('settings-menu').style.display = 'flex'; };
+    document.getElementById('backFromSettings').onclick = () => { document.getElementById('settings-menu').style.display = 'none'; document.getElementById(prevMenu).style.display = 'flex'; };
+
+    let chips = parseInt(localStorage.getItem(playerName + '_chips')) || 0;
+    let killCount = parseInt(localStorage.getItem(playerName + '_kills')) || 0;
+    let dmgLvl = parseInt(localStorage.getItem(playerName + '_dmgLvl')) || 0;
+    let hpLvl = parseInt(localStorage.getItem(playerName + '_hpLvl')) || 0;
+    let hasSpeaker = localStorage.getItem(playerName + '_hasSpeaker') === 'true';
+    let hasBig = localStorage.getItem(playerName + '_hasBig') === 'true';
+    let activeAgent = localStorage.getItem(playerName + '_activeAgent') || 'camera';
+    let usedPromos = JSON.parse(localStorage.getItem(playerName + '_usedPromos')) || {};
+    let currentMaxHP = 10 + (hpLvl * 5);
+    playerHP = currentMaxHP;
+
+    function saveProgress() { 
+        if(!playerName) return; 
+        localStorage.setItem(playerName + '_chips', chips); 
+        localStorage.setItem(playerName + '_kills', killCount); 
+        localStorage.setItem(playerName + '_dmgLvl', dmgLvl); 
+        localStorage.setItem(playerName + '_hpLvl', hpLvl); 
+        localStorage.setItem(playerName + '_hasSpeaker', hasSpeaker); 
+        localStorage.setItem(playerName + '_hasBig', hasBig); 
+        localStorage.setItem(playerName + '_activeAgent', activeAgent); 
+        localStorage.setItem(playerName + '_usedPromos', JSON.stringify(usedPromos)); 
+        let stats = JSON.parse(localStorage.getItem('players_stats') || '{}');
+        stats[playerName] = { chips, dmgLvl, hpLvl };
+        localStorage.setItem('players_stats', JSON.stringify(stats));
+    }
+    
+    window.showLeaderboard = () => {
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('leaderboard-menu').style.display = 'flex';
+        let stats = JSON.parse(localStorage.getItem('players_stats') || '{}');
+        let sorted = Object.entries(stats).sort((a, b) => b[1].chips - a[1].chips).slice(0, 5);
+        let list = document.getElementById('leaderboard-list');
+        list.innerHTML = sorted.map(([name, s], i) => `${i+1}. <b>${name}</b><br>Чипы: ${s.chips} | Урон: ${s.dmgLvl} | HP: ${s.hpLvl}<br><br>`).join('');
+    };
+    
+    function updateDisplay() { 
+        document.getElementById('player-name-display').innerText = "Игрок: " + (playerName || "Гость");
+        document.getElementById('chips-display').innerText = "Чипы: " + chips; 
+        document.getElementById('menu-chips').innerText = "Чипы: " + chips; 
+        document.getElementById('kill-display').innerText = "Убито: " + killCount; 
+        document.getElementById('dmg-lvl').innerText = dmgLvl; 
+        document.getElementById('hp-lvl').innerText = hpLvl; 
+        
+        document.getElementById('dmgBtn').innerText = (50 + (dmgLvl * 25));
+        document.getElementById('hpBtn').innerText = (50 + (hpLvl * 25));
+        
+        if(hasSpeaker) document.getElementById('btn-speaker').style.display = 'block';
+        if(hasBig) document.getElementById('btn-big').style.display = 'block';
+        if(hasSpeaker) document.getElementById('buySpeakerBtn').style.display = 'none';
+        if(hasBig) document.getElementById('buyBigBtn').style.display = 'none';
+        saveProgress(); 
+    }
+    
+    window.buySpeaker = () => { if(chips >= 150) { chips -= 150; hasSpeaker = true; updateDisplay(); } };
+    window.buyBig = () => { if(chips >= 200) { chips -= 200; hasBig = true; updateDisplay(); } };
+    
+    window.applyPromo = () => {
+        let code = document.getElementById('promoInput').value.trim().toUpperCase();
+        if (code === 'SKIBIDI') {
+            if (usedPromos['SKIBIDI']) {
+                alert('Этот промокод уже был активирован!');
+            } else {
+                chips += 600;
+                usedPromos['SKIBIDI'] = true;
+                updateDisplay();
+                alert('Промокод активирован! Вы получили 600 чипов.');
+            }
+        } else {
+            alert('Неверный промокод!');
+        }
+    };
+    
+    window.setAgent = (type) => { 
+        activeAgent = type; 
+        const h = (type === 'big') ? 2.0 : (type === 'speaker' ? 1.5 : 1.25);
+        player.scale.set((type === 'big'? 3.5 : 2)/2, (type === 'big'? 3.5 : 2.5)/2.5, 1);
+        player.material.map = loadSharp(type === 'speaker' ? 'spiker.png' : (type === 'big' ? 'big_cam.png' : 'Kamera-Men.png')); 
+        player.position.y = h;
+        updateDisplay(); 
+    };
+    
+    const pressedKeys = new Set();
+    window.press = (code) => pressedKeys.add(code);
+    window.release = (code) => pressedKeys.delete(code);
+    window.upgrade = (type) => { 
+        let cost = 50 + ((type === 'dmg' ? dmgLvl : hpLvl) * 25);
+        if (type === 'dmg' && chips >= cost) { chips -= cost; dmgLvl++; } 
+        else if (type === 'hp' && chips >= cost) { chips -= cost; hpLvl++; currentMaxHP += 5; playerHP += 5; } 
+        updateDisplay(); 
+    };
+
+    scene.add(new THREE.AmbientLight(0xffffff, 1));
+    listener = new THREE.AudioListener();
+    camera.add(listener);
+    
+    menuMusic = new THREE.Audio(listener);
+    audioLoader = new THREE.AudioLoader();
+    audioLoader.load('menu_sound.mp3', (buffer) => {
+        menuMusic.setBuffer(buffer); menuMusic.setLoop(true); menuMusic.setVolume(0.3);
+        if(musicEnabled) menuMusic.play();
+    });
+
+    const createTex = (url, rx, ry) => { const t = loadSharp(url); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); return t; };
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshBasicMaterial({ map: createTex('grass.png', 20, 20), color: 0xffffff })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+    
+    const wallBoundaries = [{x:0, z:50, w:100, d:2}, {x:0, z:-50, w:100, d:2}, {x:50, z:0, w:2, d:100}, {x:-50, z:0, w:2, d:100}];
+    wallBoundaries.forEach(b => { const wall = new THREE.Mesh(new THREE.BoxGeometry(b.w, 12, b.d), new THREE.MeshBasicMaterial({ map: createTex('walls.jpg', 20, 1), color: 0xffffff })); wall.position.set(b.x, 6, b.z); scene.add(wall); walls.push(new THREE.Box3().setFromObject(wall)); });
+
+    player = new THREE.Mesh(new THREE.PlaneGeometry(2, 2.5), new THREE.MeshBasicMaterial({ map: loadSharp('Kamera-Men.png'), color: 0xffffff, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide }));
+    window.setAgent(activeAgent); player.position.set(0, 1.25, 0); scene.add(player);
+
+    function spawnMedkit() { if(medkit) scene.remove(medkit); if(Math.random() < 0.3) { medkit = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), new THREE.MeshBasicMaterial({ map: loadSharp('aptechka.png'), color: 0xffffff, transparent: true, alphaTest: 0.5 })); medkit.position.set((Math.random()-0.5)*80, 1.5, (Math.random()-0.5)*80); scene.add(medkit); } }
+    
+    function spawnEnemy(count = 1) { 
+        if (enemies.length >= 6) return;
+        for(let i=0; i<count; i++) {
+            if (enemies.length >= 6) break;
+            let isUpg = Math.random() < 0.4; 
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 3.5), new THREE.MeshBasicMaterial({ map: loadSharp(isUpg ? 'Upg_Skibidi.png' : 'Skibidi.png'), color: 0xffffff, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide })); 
+            mesh.position.set((Math.random()-0.5)*80, 1.75, (Math.random()-0.5)*80); 
+            scene.add(mesh); 
+            enemies.push({ mesh, hp: isUpg ? 5 : 3, damage: isUpg ? 3 : 1, speed: 0.04 + Math.random() * 0.03, lastShot: performance.now(), shotDelay: 1000 + Math.random() * 2000, isUpg: isUpg }); 
+        }
+    }
+
+    window.startMode = () => { document.getElementById('mode-menu').style.display = 'none'; if(menuMusic.isPlaying) menuMusic.stop(); isPlaying = true; spawnEnemy(3); setInterval(() => { if(isPlaying && !isPaused) spawnEnemy(Math.random() < 0.3 ? (Math.random() < 0.5 ? 2 : 3) : 1); }, 8000); setInterval(spawnMedkit, 10000); };
+    document.getElementById('shopBtn').onclick = () => { document.getElementById('menu').style.display='none'; document.getElementById('shop-menu').style.display='flex'; };
+    document.getElementById('agentsBtn').onclick = () => { document.getElementById('menu').style.display='none'; document.getElementById('agents-menu').style.display='flex'; };
+    document.getElementById('pause-btn').onclick = () => { isPaused=true; document.getElementById('pause-menu').style.display='flex'; };
+    document.getElementById('resumeBtn').onclick = () => { isPaused=false; document.getElementById('pause-menu').style.display='none'; };
+
+    window.triggerAttack = () => { 
+        if(attackCooldown || !isPlaying || isPaused) return; 
+        enemies.forEach((e, i) => { 
+            if(e.mesh.position.distanceTo(player.position) < 5) { 
+                e.hp -= (activeAgent === 'big' ? 2 : 1) + dmgLvl; 
+                if(e.hp <= 0) { scene.remove(e.mesh); enemies.splice(i, 1); chips += 10; killCount++; if(killCount % 10 === 0) chips += 200; updateDisplay(); spawnEnemy(1); } 
+            } 
+        }); 
+        attackCooldown = true; 
+        attackCooldownTimer = 1.0;
+        document.getElementById('attack-btn').innerText = "1.0s";
+        let interval = setInterval(() => {
+            attackCooldownTimer -= 0.1;
+            document.getElementById('attack-btn').innerText = attackCooldownTimer.toFixed(1) + "s";
+            if(attackCooldownTimer <= 0) {
+                clearInterval(interval);
+                attackCooldown = false;
+                document.getElementById('attack-btn').innerText = "УДАР";
+            }
+        }, 100);
+    };
+
+    container.addEventListener('pointerdown', (e) => { if (e.target.classList.contains('j-btn') || e.target.id === 'attack-btn' || e.target.id === 'jump-btn' || e.target.id === 'promoInput') return; isMouseDown = true; lastPointerX = e.clientX; lastPointerY = e.clientY; });
+    window.addEventListener('pointermove', (e) => { if(isMouseDown && isPlaying && !isPaused) { camRot.theta += (e.clientX - lastPointerX) * 0.01; camRot.phi += (e.clientY - lastPointerY) * 0.01; camRot.phi = Math.max(0.1, Math.min(Math.PI / 2 - 0.1, camRot.phi)); lastPointerX = e.clientX; lastPointerY = e.clientY; } });
+    window.onpointerup = () => isMouseDown = false;
+    window.onkeydown = (e) => { pressedKeys.add(e.code); if (e.code === 'Space') window.tryJump(); };
+    window.onkeyup = (e) => pressedKeys.delete(e.code);
+    
+    function animate(time) {
+        requestAnimationFrame(animate); 
+        
+        let menus = ['menu', 'game-over', 'pause-menu', 'shop-menu', 'agents-menu', 'enemies-info', 'reg-menu', 'settings-menu', 'mode-menu', 'login-menu', 'leaderboard-menu'];
+        let isAnyMenuOpen = menus.some(id => document.getElementById(id).style.display === 'flex');
+        
+        if (isAnyMenuOpen) {
+            renderer.setClearColor(0x87ceeb);
+            renderer.clear();
+            return;
+        }
+
+        renderer.render(scene, camera);
+        
+        if(!isPlaying || isPaused) return;
+        
+        let targetY = (activeAgent === 'big') ? 2.0 : (activeAgent === 'speaker' ? 1.5 : 1.25);
+        velocityY -= 0.012; player.position.y += velocityY; if(player.position.y < targetY) { player.position.y = targetY; velocityY = 0; }
+        
+        let move = new THREE.Vector3(0,0,0);
+        if(pressedKeys.has('KeyW')) move.z -= 0.15; if(pressedKeys.has('KeyS')) move.z += 0.15; if(pressedKeys.has('KeyA')) move.x -= 0.15; if(pressedKeys.has('KeyD')) move.x += 0.15;
+        let moveWorld = move.applyAxisAngle(new THREE.Vector3(0,1,0), camRot.theta);
+        let nextPos = player.position.clone().add(moveWorld);
+        let playerBox = new THREE.Box3().setFromCenterAndSize(nextPos, new THREE.Vector3(1, 2.5, 1));
+        if(!walls.some(w => playerBox.intersectsBox(w))) player.position.copy(nextPos);
+        
+        if(medkit && player.position.distanceTo(medkit.position) < 4.0) { scene.remove(medkit); medkit = null; playerHP = Math.min(currentMaxHP, playerHP + 3); document.getElementById('hp-display').innerText="HP: "+playerHP; }
+
+        enemies.forEach((e, idx) => {
+            e.mesh.lookAt(camera.position.x, e.mesh.position.y, camera.position.z);
+            let dist = e.mesh.position.distanceTo(player.position);
+            
+            if (dist < 20) {
+                let dir = player.position.clone().sub(e.mesh.position).normalize();
+                let avoid = new THREE.Vector3(0,0,0);
+                enemies.forEach((other, otherIdx) => {
+                    if(idx !== otherIdx) {
+                        let d = e.mesh.position.distanceTo(other.mesh.position);
+                        if(d < 4) { let pushDir = e.mesh.position.clone().sub(other.mesh.position).normalize(); avoid.add(pushDir.multiplyScalar(0.05)); }
+                    }
+                });
+                if(dist > 6) e.mesh.position.add(dir.multiplyScalar(e.speed).add(avoid));
+                
+                if(dist > 5 && time - e.lastShot > e.shotDelay) { 
+                    let b = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({color: 0xff0000}));
+                    b.position.copy(e.mesh.position).y += 1.0; scene.add(b);
+                    bullets.push({mesh: b, dir: player.position.clone().sub(e.mesh.position).normalize(), created: time});
+                    e.lastShot = time;
+                }
+            }
+        });
+        
+        for(let i = bullets.length - 1; i >= 0; i--) {
+            let b = bullets[i];
+            b.mesh.position.add(b.dir.clone().multiplyScalar(0.08));
+            if(b.mesh.position.distanceTo(player.position) < 1.5) { scene.remove(b.mesh); bullets.splice(i, 1); playerHP--; document.getElementById('hp-display').innerText="HP: "+playerHP; if(playerHP <= 0) { isPlaying = false; document.getElementById('game-over').style.display='flex'; } }
+            else if(time - b.created > 3000) { scene.remove(b.mesh); bullets.splice(i, 1); }
+        }
+        
+        player.lookAt(camera.position.x, player.position.y, camera.position.z);
+        let cp = new THREE.Vector3(player.position.x + camDist*Math.sin(camRot.theta)*Math.cos(camRot.phi), player.position.y+2+camDist*Math.sin(camRot.phi), player.position.z + camDist*Math.cos(camRot.theta)*Math.cos(camRot.phi));
+        camera.position.lerp(cp, 0.2); camera.lookAt(player.position.x, player.position.y + 1, player.position.z);
+    }
+    animate(); updateDisplay();
+</script>
+</body>
+</html>
