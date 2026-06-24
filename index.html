@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Toilet-Fight</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <style>
+        body { margin: 0; overflow: hidden; background: #87ceeb; font-family: 'Courier New', Courier, monospace; touch-action: none; display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+        #game-container { position: relative; width: 100%; max-width: 450px; height: 100%; background: #87ceeb; overflow: hidden; border: 2px solid #333; touch-action: none; }
+        
+        #menu, #game-over, #pause-menu, #shop-menu, #agents-menu, #enemies-info, #reg-menu, #settings-menu, #mode-menu, #login-menu, #leaderboard-menu, #tree-menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; justify-content: flex-start; align-items: center; background: #2c3e50; color: #00ffcc; z-index: 100; pointer-events: auto; padding-top: 20px; box-sizing: border-box; }
+        #menu { display: flex; justify-content: flex-start; }
+        
+        #menu-content { display: flex; justify-content: space-between; width: 100%; padding: 10px; box-sizing: border-box; align-items: center; }
+        .menu-col { display: flex; flex-direction: column; width: 30%; }
+        .menu-center { display: flex; flex-direction: column; align-items: center; width: 35%; text-align: center; }
+        
+        button { 
+            padding: 10px 5px; margin: 5px 0; font-size: 14px; cursor: pointer; 
+            background: linear-gradient(135deg, #4a6fa5, #2c3e50); 
+            color: #fff; border: 2px solid #00ffcc; border-radius: 0px; 
+            text-transform: uppercase; font-weight: bold;
+            box-shadow: 2px 2px 0px #000;
+            transition: all 0.2s; touch-action: manipulation;
+        }
+        button:hover { background: #3498db; border-color: #fff; }
+        button:active { background: #00ffcc; color: #000; transform: translateY(2px); box-shadow: none; }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+        .shake-animation { animation: shake 0.3s linear; }
+        
+        #hud { position: absolute; top: 10px; left: 10px; width: calc(100% - 20px); z-index: 50; pointer-events: none; }
+        #hp-container { width: 100%; max-width: 200px; height: 25px; background: #333; border: 2px solid #fff; position: relative; margin-bottom: 8px; }
+        #hp-bar { height: 100%; width: 100%; background: #ff0000; transition: width 0.3s; }
+        #hp-text { position: absolute; width: 100%; text-align: center; line-height: 25px; color: white; font-weight: bold; text-shadow: 1px 1px 2px black; font-size: 14px; }
+        
+        #hud-bottom { position: absolute; top: 45px; left: 10px; display: flex; align-items: flex-start; gap: 10px; z-index: 55; }
+        #minimap { width: 150px; height: 150px; background: rgba(0,0,0,0.5); border: 2px solid white; border-radius: 5px; overflow: hidden; }
+        #mapCanvas { width: 150px; height: 150px; display: block; }
+        #stats-hud { color: white; font-size: 14px; font-weight: bold; text-shadow: 1px 1px 2px black; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 5px; pointer-events: auto; }
+        
+        #pause-btn { position: absolute; top: 10px; right: 10px; padding: 6px 12px; z-index: 60; cursor: pointer; }
+        
+        #controls-layout { position: absolute; bottom: 80px; width: 100%; display: flex; justify-content: space-between; align-items: flex-end; z-index: 50; pointer-events: none; padding: 0 10px; box-sizing: border-box; }
+        #controls-layout > * { pointer-events: auto; }
+        
+        #joystick-area { width: 120px; height: 120px; border: 4px solid rgba(255,255,255,0.3); border-radius: 50%; position: relative; background: rgba(0,0,0,0.2); touch-action: none; display: flex; justify-content: center; align-items: center; }
+        #joystick-knob { width: 50px; height: 50px; background: rgba(255,255,255,0.6); border-radius: 50%; position: absolute; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        
+        #jump-btn, #attack-btn { width: 80px; height: 80px; border-radius: 50%; border: 4px solid #fff; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; font-size: 14px; font-weight: bold; text-align: center; }
+        #jump-btn { background: #007bff; }
+        #attack-btn { background: #ff0000; }
+        
+        input { padding: 8px; font-size: 16px; margin-bottom: 8px; width: 70%; background-color: #333; color: white; border: 1px solid #555; border-radius: 6px;}
+        #player-name-display { font-size: 14px; }
+
+        .tree-layout { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 10px; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 12px; border: 2px solid #555; width: 90%; }
+        .tree-row { display: flex; justify-content: center; gap: 15px; width: 100%; }
+        .tree-node { width: 80px; height: 80px; font-size: 11px; border-radius: 10px; background: linear-gradient(135deg, #34495e, #2c3e50); border: 2px solid #7f8c8d; color: white; display: flex; justify-content: center; align-items: center; text-align: center; flex-direction: column; cursor: pointer; transition: 0.2s; padding: 2px; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); }
+        .tree-node:hover { border-color: #00ffcc; transform: scale(1.05); }
+        .tree-node.locked { border-color: #e74c3c; opacity: 0.6; }
+        .tree-connector-v { width: 2px; height: 20px; background: #7f8c8d; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="reg-menu">
+        <h1>РЕГИСТРАЦИЯ</h1>
+        <form id="regForm" style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+            <input type="text" id="regName" placeholder="Имя..." required>
+            <input type="password" id="regPass" placeholder="Пароль..." required>
+            <button type="submit" onclick="window.playClick()">СОЗДАТЬ</button>
+        </form>
+        <button onclick="window.playClick(); document.getElementById('reg-menu').style.display='none'; document.getElementById('login-menu').style.display='flex'">ЕСТЬ АККАУНТ?</button>
+    </div>
+
+    <div id="login-menu">
+        <h1>ВХОД</h1>
+        <form id="loginForm" style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+            <input type="text" id="logName" placeholder="Имя..." required>
+            <input type="password" id="logPass" placeholder="Пароль..." required>
+            <button type="submit" onclick="window.playClick()">ВОЙТИ</button>
+        </form>
+        <button onclick="window.playClick(); document.getElementById('login-menu').style.display='none'; document.getElementById('reg-menu').style.display='flex'">НАЗАД</button>
+    </div>
+    
+    <div id="mode-menu">
+        <h1>РЕЖИМ</h1>
+        <button onclick="window.playClick(); window.startMode()">ВЫЛАЗКИ</button>
+        <button id="soon-btn">СКОРО БУДЕТ...</button>
+        <button onclick="window.playClick(); document.getElementById('mode-menu').style.display='none'; document.getElementById('menu').style.display='flex'">НАЗАД</button>
+    </div>
+
+    <div id="hud">
+        <div id="hp-container">
+            <div id="hp-bar"></div>
+            <div id="hp-text">HP: 10</div>
+        </div>
+        <div id="hud-bottom">
+            <div id="minimap">
+                <canvas id="mapCanvas" width="150" height="150"></canvas>
+            </div>
+            <div id="stats-hud">
+                <div id="chips-display">Чипы: 0</div>
+                <div id="kill-display">Убито: 0</div>
+            </div>
+        </div>
+    </div>
+    
+    <button id="pause-btn" onclick="window.playClick(); window.pauseGame()">ПАУЗА</button>
+
+    <div id="menu">
+        <div id="player-name-display"></div> <h1>Toilet-Fight</h1>
+        
+        <div id="menu-content">
+            <div class="menu-col">
+                <button id="startBtn" onclick="window.playClick(); document.getElementById('menu').style.display='none'; document.getElementById('mode-menu').style.display='flex'">ИГРАТЬ</button>
+                <button id="shopBtn" onclick="window.playClick()">МАГАЗИН</button>
+                <button id="agentsBtn" onclick="window.playClick()">АГЕНТЫ</button>
+                <button onclick="window.playClick(); window.showLeaderboard()">ЛИДЕРЫ</button>
+            </div>
+            
+            <div class="menu-center">
+                <div id="menu-chips-display" style="color: #ff0; font-weight: bold; margin-bottom: 5px;">Чипы: 0</div>
+                <div id="agent-display" style="margin-bottom: 5px; color: #00ffcc; font-size: 14px;">Агент: Камера-Мен</div>
+                <img id="agent-preview-img" src="Kamera-Men.png" style="width: 100px; height: 100px; margin: 10px 0;">
+            </div>
+            
+            <div class="menu-col">
+                <button onclick="window.playClick(); document.getElementById('menu').style.display='none'; document.getElementById('enemies-info').style.display='flex'">ВРАГИ</button>
+                <button onclick="window.playClick(); window.openSettings('menu')">НАСТРОЙКИ</button>
+                <button onclick="window.playClick(); window.openTree()">ДРЕВО ПРОКАЧЕК</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tree-menu">
+        <h1>ДРЕВО ПОЗНАНИЙ</h1>
+        <div id="tree-chips" style="font-size: 18px; color: #ff0; margin-bottom: 5px;">Чипы: 0</div>
+        <div style="font-size: 10px; text-align: center; margin-bottom: 10px;">Прокачка Уровня увеличивает силу врагов, <br>но позволяет качать навыки дальше!</div>
+        
+        <div class="tree-layout">
+            <div class="tree-row">
+                <div id="btn-tree-level" class="tree-node" onclick="window.playClick(); window.upgradeTree('level')">УРОВЕНЬ 1<br>(100)</div>
+            </div>
+            
+            <div class="tree-connector-v"></div>
+            
+            <div class="tree-row">
+                <div id="btn-tree-hp" class="tree-node" onclick="window.playClick(); window.upgradeTree('hp')">ХП: 0<br>(50)</div>
+                <div id="btn-tree-dmg" class="tree-node" onclick="window.playClick(); window.upgradeTree('dmg')">УРОН: 0<br>(50)</div>
+                <div id="btn-tree-cold" class="tree-node" onclick="window.playClick(); window.upgradeTree('cold')">ХОЛОД: 0<br>(100)</div>
+            </div>
+        </div>
+
+        <button style="margin-top: 20px;" onclick="window.playClick(); document.getElementById('tree-menu').style.display='none'; document.getElementById('menu').style.display='flex'">НАЗАД</button>
+    </div>
+    
+    <div id="leaderboard-menu">
+        <h1>ГЛОБАЛЬНЫЙ ТОП 5</h1>
+        <div id="leaderboard-list" style="font-size: 14px; text-align: left; width: 90%; max-height: 60%; overflow-y: auto;">Загрузка топа со всех устройств...</div>
+        <button onclick="window.playClick(); document.getElementById('leaderboard-menu').style.display='none'; document.getElementById('menu').style.display='flex'">НАЗАД</button>
+    </div>
+
+    <div id="settings-menu">
+        <h1>НАСТРОЙКИ</h1>
+        <button onclick="window.playClick(); window.toggleAudio('music')">МУЗЫКА: <span id="mus-status">ВКЛ</span></button>
+        <button onclick="window.playClick(); window.toggleAudio('fx')">ЭФФЕКТЫ: <span id="fx-status">ВКЛ</span></button>
+        <button onclick="window.playClick(); document.getElementById('settings-menu').style.display='none'; document.getElementById('login-menu').style.display='flex'">ВОЙТИ В АККАУНТ</button>
+        <button onclick="window.playClick(); window.logout()">ВЫЙТИ</button>
+        <button id="backFromSettings" onclick="window.playClick()">НАЗАД</button>
+    </div>
+
+    <div id="enemies-info">
+        <h1>ВРАГИ</h1>
+        <p>СКИБИДИСТ: 3 ХП, 1 урон</p>
+        <p>ПРОКАЧЕННЫЙ: 5 ХП, 3 урона</p>
+        <p style="font-size: 12px; color: yellow;">Внимание: Характеристики врагов<br>растут с Уровнем Древа Познаний!</p>
+        <button onclick="window.playClick(); document.getElementById('enemies-info').style.display='none'; document.getElementById('menu').style.display='flex'">НАЗАД</button>
+    </div>
+
+    <div id="shop-menu">
+        <h1>МАГАЗИН</h1>
+        <button id="buySpeakerBtn" onclick="window.buySpeaker()">СПИКЕР-МЕН (150)</button>
+        <button id="buyBigBtn" onclick="window.buyBig()">БИГ-КАМЕРА (200)</button>
+        <input type="text" id="promoInput" placeholder="Промокод...">
+        <button id="promoBtn" onclick="window.playClick(); window.applyPromo()">АКТИВИРОВАТЬ</button>
+        <button onclick="window.playClick(); document.getElementById('shop-menu').style.display='none'; document.getElementById('menu').style.display='flex'">НАЗАД</button>
+    </div>
+
+    <div id="agents-menu">
+        <h1>АГЕНТЫ</h1>
+        <button id="btn-camera" onclick="window.playClick(); window.setAgent('camera')">КАМЕРА-МЕН</button>
+        <button id="btn-speaker" style="display:none;" onclick="window.playClick(); window.setAgent('speaker')">СПИКЕР-МЕН</button>
+        <button id="btn-big" style="display:none;" onclick="window.playClick(); window.setAgent('big')">БИГ-КАМЕРА</button>
+        <button onclick="window.playClick(); document.getElementById('agents-menu').style.display='none'; document.getElementById('menu').style.display='flex'">НАЗАД</button>
+    </div>
+
+    <div id="pause-menu">
+        <h1>ПАУЗА</h1>
+        <button id="resumeBtn" onclick="window.playClick(); window.resumeGame()">ПРОДОЛЖИТЬ</button>
+        <button onclick="window.playClick(); location.reload()">В МЕНЮ</button>
+    </div>
+
+    <div id="game-over">
+        <h1>ВЫ ПРОИГРАЛИ</h1>
+        <button onclick="window.playClick(); location.reload()">В МЕНЮ</button>
+    </div>
+
+    <div id="controls-layout">
+        <div id="jump-btn" onpointerdown="window.tryJump()">JUMP</div>
+        <div id="joystick-area">
+            <div id="joystick-knob"></div>
+        </div>
+        <div id="attack-btn" onpointerdown="window.triggerAttack()">УДАР</div>
+    </div>
+</div>
+
+<script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
+<script type="module">
+    import * as THREE from 'three';
+    const container = document.getElementById('game-container');
+    
+    let clickSound, errorSound, paySuccessSound;
+    
+    function updateHUD() {
+        const hpBar = document.getElementById('hp-bar');
+        const hpText = document.getElementById('hp-text');
+        const percent = (playerHP / currentMaxHP) * 100;
+        hpBar.style.width = percent + "%";
+        hpText.innerText = "HP: " + playerHP;
+    }
+
+    function updateAgentDisplay() {
+        const imgElement = document.getElementById('agent-preview-img');
+        const sprites = { camera: 'Kamera-Men.png', speaker: 'spiker.png', big: 'big_cam.png' };
+        imgElement.src = sprites[activeAgent] || 'Kamera-Men.png';
+        document.getElementById('agent-display').innerText = "Агент: " + (activeAgent === 'big' ? 'Биг-Камера' : (activeAgent === 'speaker' ? 'Спикер-Мен' : 'Камера-Мен'));
+    }
+
+    const soonBtn = document.getElementById('soon-btn');
+    soonBtn.onclick = () => {
+        window.playErrorSound();
+        soonBtn.style.borderColor = 'red';
+        soonBtn.style.color = 'red';
+        soonBtn.classList.add('shake-animation');
+        setTimeout(() => {
+            soonBtn.style.borderColor = '';
+            soonBtn.style.color = '';
+            soonBtn.classList.remove('shake-animation');
+        }, 300);
+    };
+
+    const loader = new THREE.TextureLoader();
+    const texturesCache = {};
+    const assets = ['Kamera-Men.png', 'Kamera-Left.png', 'Kamera-Right.png', 'spiker.png', 'Spiker-Left.png', 'Spiker-Right.png', 'big_cam.png', 'BigKam-Left.png', 'BigKam-Right.png', 'grass.png', 'walls.jpg', 'Skibidi.png', 'Upg_Skibidi.png', 'aptechka.png'];
+    assets.forEach(url => { texturesCache[url] = loader.load(url); });
+    const getTex = (url) => texturesCache[url];
+
+    const bannedWords = ['хуй', 'пизда', 'ебать', 'сука', 'бля', 'гандон', 'чмо', 'пидор', 'гандоны', 'хуесос', 'ебанат', 'уебан', 'пиздец', 'хуня', 'ебало', 'суки', 'блядь', 'гандониха', 'мудак', 'пиздюк', 'хуйло', 'ебатько', 'пидорас', 'пидоры', 'пиздобол', 'хуеплет', 'ебанутый', 'сучка', 'бляди', 'гандонский', 'хуйню', 'пиздить', 'ебать-колотить', 'хуярить', 'ебаться', 'пизде', 'хули', 'ебаный', 'хуйнюшка', 'пизденыш', 'хуи', 'ебарей', 'пиздюлина', 'хуйцов', 'ебаки', 'пиздюха', 'хуйнуть', 'ебальником', 'пиздишь', 'хуеta', 'ебанушка', 'сучара', 'блядина', 'гандоша', 'хуево', 'пиздецовый', 'ебанашка', 'хуйни', 'пиздопротивный', 'хуевый', 'ебанавт', 'пиздюль', 'хуевертить', 'ебать-копать', 'пизденыш', 'хуя', 'ебашишь', 'пизди', 'хуй-пизда', 'ебака', 'пиздец-полный', 'хуесосить', 'ебальник', 'пиздуй', 'хуеplety', 'ебать-его', 'сучары', 'блядота', 'гандон-человек', 'хуйлан', 'пиздеть', 'ебануто', 'хуякнутый', 'пизденыша', 'хуеглот', 'ебануть', 'пиздос', 'хуй-на', 'ебарей-молодец', 'пиздюли', 'хуй-с-тобой', 'ебаться-в-рот', 'пиздецо', 'хулиган', 'ебать-ты', 'сука-бля', 'блядский', 'гандонство', 'хуй-тебе', 'пиздоблядский', 'хуятина', 'ебанаты', 'пизденыши', 'хуй-вам', 'ебанутые', 'пиздюха-мать', 'хуеплетка', 'ебать-копать-твою-мать', 'сукина-дочь', 'блядина-тупая', 'гандонская-рожа', 'хуй-в-рот', 'пиздодельный', 'хуеплетина', 'ебанутая', 'сука-падла', 'блядюга', 'гандон-позорный', 'хуй-с-маслом', 'пиздишь-как-дышишь', 'хуесосина', 'ебанашка-мать', 'пиздец-тебе', 'хуевая', 'ебанутый-в-хлам', 'пиздюль-тебе', 'хуй-тебе-в-рот', 'ебать-срать', 'пиздоbraтия', 'хуярим', 'ебарь-террорист', 'сука-блядь', 'блядство', 'гандон-дырявый', 'хуй-вам-а-не-имя', 'пиздос-полный', 'хуеплеты-мать', 'ебанутая-mразь', 'сука-ты-тварь', 'блядская-рожа', 'гандоны-позорные', 'хуй-тебе-в-очко', 'пизди-больше', 'хуесос-мать', 'ебанавт-криворукий', 'пиздец-какой', 'хуевый-день', 'ебанутый-на-всю-голову', 'сучка-крашена', 'блядина-мерзкая', 'гандон-немытый', 'хуй-там', 'пиздопляска', 'хуеплет-старый', 'ебанаты-лесные', 'пизденыш-мелкий', 'хуесоska', 'ебать-колотить-всех', 'пиздец-катятам', 'хуй-с-горы', 'ебаный-роток', 'пиздоглазый', 'хуевина', 'ебарь-неудачник', 'сука-драная', 'блядь-сука', 'гандон-штопаный', 'хуй-тебе-в-зубы', 'пиздобол-старый', 'хуеплетина-тупая', 'ебанашка-кривая', 'пизденыш-гнилой', 'хуесос-дырявый', 'ебанутый-осел', 'сука-позорная', 'блядюга-тупая', 'гандон-недоделанный', 'хуй-с-маком', 'пизди-да-не-запиздись', 'хуеплеты-позорные', 'ебанавт-тупорылый'];
+    function isNameValid(name) { const lowerName = name.toLowerCase(); return !bannedWords.some(word => lowerName.includes(word)); }
+
+    let scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+    let camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+    let renderer = new THREE.WebGLRenderer({antialias: true});
+    renderer.setSize(container.clientWidth || 400, container.clientHeight || 800);
+    container.appendChild(renderer.domElement);
+
+    let keys = { KeyW: false, KeyA: false, KeyS: false, KeyD: false };
+    window.addEventListener('keydown', (e) => { 
+        if(keys.hasOwnProperty(e.code)) keys[e.code] = true; 
+        if(e.code === 'Space') window.tryJump();
+    });
+    window.addEventListener('keyup', (e) => { 
+        if(keys.hasOwnProperty(e.code)) keys[e.code] = false; 
+    });
+
+    const mapCanvas = document.getElementById('mapCanvas');
+    const ctx = mapCanvas.getContext('2d');
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (let entry of entries) {
+            const w = entry.contentRect.width;
+            const h = entry.contentRect.height;
+            if (w > 0 && h > 0) { camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h); }
+        }
+    });
+    resizeObserver.observe(container);
+
+    let listener, menuMusic, audioLoader;
+    let musicEnabled = localStorage.getItem('audio_music') !== 'false';
+    let fxEnabled = localStorage.getItem('audio_fx') !== 'false';
+    let prevMenu = '';
+    
+    let player, enemies = [], medkit = null, walls = [], wallData = [], bullets = [];
+    let isPlaying = false, isPaused = false, isMouseDown = false, velocityY = 0, lastPointerX = 0, lastPointerY = 0, camPointerId = -1;
+    let playerHP = 10, attackCooldown = false, attackCooldownTimer = 0;
+    let camRot = { theta: 0, phi: 0.8 }, camDist = 12;
+    let animFrame = 0, animTimer = 0;
+    
+    let joyX = 0, joyY = 0, joyActive = false, joyPointerId = -1;
+    const joyArea = document.getElementById('joystick-area');
+    const joyKnob = document.getElementById('joystick-knob');
+    
+    joyArea.addEventListener('pointerdown', (e) => { 
+        if (joyActive) return;
+        joyPointerId = e.pointerId;
+        joyActive = true; 
+        updateJoy(e); 
+    });
+
+    window.addEventListener('pointermove', (e) => { 
+        if(joyActive && e.pointerId === joyPointerId) updateJoy(e); 
+        else if(isMouseDown && e.pointerId === camPointerId && isPlaying && !isPaused) {
+            camRot.theta += (e.clientX - lastPointerX) * 0.01;
+            camRot.phi += (e.clientY - lastPointerY) * 0.01;
+            camRot.phi = Math.max(0.1, Math.min(Math.PI / 2 - 0.1, camRot.phi));
+            lastPointerX = e.clientX;
+            lastPointerY = e.clientY;
+        }
+    });
+
+    const handlePointerEnd = (e) => {
+        if(e.pointerId === joyPointerId) { joyActive = false; joyX = 0; joyY = 0; joyKnob.style.transform = 'translate(0px, 0px)'; joyPointerId = -1; }
+        if(e.pointerId === camPointerId) { isMouseDown = false; camPointerId = -1; }
+    };
+    window.addEventListener('pointerup', handlePointerEnd);
+    window.addEventListener('pointercancel', handlePointerEnd);
+
+    function updateJoy(e) {
+        const rect = joyArea.getBoundingClientRect();
+        const centerX = rect.left + rect.width/2;
+        const centerY = rect.top + rect.height/2;
+        let dx = e.clientX - centerX;
+        let dy = e.clientY - centerY;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist > 40) { dx = (dx/dist)*40; dy = (dy/dist)*40; }
+        joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+        joyX = dx/40; joyY = dy/40;
+    }
+
+    let playerName = localStorage.getItem('playerName');
+    if (!playerName) { document.getElementById('reg-menu').style.display = 'flex'; } else { document.getElementById('menu').style.display = 'flex'; }
+    
+    document.getElementById('regForm').onsubmit = (e) => { 
+        e.preventDefault(); 
+        let name = document.getElementById('regName').value; 
+        let pass = document.getElementById('regPass').value;
+        if(!isNameValid(name)) { alert("Недопустимое имя!"); return; } 
+        if(localStorage.getItem(name + '_pass')) { alert("Игрок существует!"); return; }
+        playerName = name; 
+        localStorage.setItem('playerName', playerName); 
+        localStorage.setItem(playerName + '_pass', pass);
+        document.getElementById('reg-menu').style.display = 'none'; 
+        document.getElementById('menu').style.display = 'flex'; 
+        updateDisplay(); 
+    };
+
+    document.getElementById('loginForm').onsubmit = (e) => { 
+        e.preventDefault(); 
+        let name = document.getElementById('logName').value; 
+        let pass = document.getElementById('logPass').value;
+        if (localStorage.getItem(name + '_pass') === pass) {
+            playerName = name;
+            localStorage.setItem('playerName', playerName);
+            document.getElementById('login-menu').style.display = 'none'; 
+            document.getElementById('menu').style.display = 'flex'; 
+            updateDisplay(); 
+        } else {
+            alert("Неверно!");
+        }
+    };
+    
+    window.logout = () => { 
+        if (confirm("Выйти из аккаунта?")) {
+            localStorage.removeItem('playerName'); 
+            location.reload();
+        }
+    };
+    window.tryJump = () => { 
+        let targetY = (activeAgent === 'big') ? 2.0 : (activeAgent === 'speaker' ? 1.5 : 1.25);
+        if(isPlaying && !isPaused && player.position.y <= targetY + 0.01) velocityY = 0.25; 
+    };
+
+    window.toggleAudio = (type) => {
+        if(type === 'music') { musicEnabled = !musicEnabled; localStorage.setItem('audio_music', musicEnabled); if(!musicEnabled) menuMusic.pause(); else menuMusic.play(); }
+        else { fxEnabled = !fxEnabled; localStorage.setItem('audio_fx', fxEnabled); }
+        document.getElementById('mus-status').innerText = musicEnabled ? 'ВКЛ' : 'ВЫКЛ';
+        document.getElementById('fx-status').innerText = fxEnabled ? 'ВКЛ' : 'ВЫКЛ';
+    };
+
+    window.openSettings = (from) => { prevMenu = from; document.getElementById(from).style.display = 'none'; document.getElementById('settings-menu').style.display = 'flex'; };
+    document.getElementById('backFromSettings').onclick = () => { window.playClick(); document.getElementById('settings-menu').style.display = 'none'; document.getElementById(prevMenu).style.display = 'flex'; };
+
+    window.pauseGame = () => {
+        isPaused = true;
+        document.getElementById('pause-menu').style.display = 'flex';
+    };
+    window.resumeGame = () => {
+        isPaused = false;
+        document.getElementById('pause-menu').style.display = 'none';
+    };
+
+    window.playClick = () => { 
+        if (listener && listener.context && listener.context.state === 'suspended') { listener.context.resume(); }
+        if (musicEnabled && menuMusic && !menuMusic.isPlaying && isPlaying === false) { try { menuMusic.play(); } catch(e){} }
+        if(fxEnabled && clickSound) { clickSound.stop(); clickSound.play(); } 
+    };
+    window.playErrorSound = () => { 
+        if (listener && listener.context && listener.context.state === 'suspended') { listener.context.resume(); }
+        if(fxEnabled && errorSound) { errorSound.stop(); errorSound.play(); } 
+    };
+    window.playPaySuccessSound = () => { 
+        if (listener && listener.context && listener.context.state === 'suspended') { listener.context.resume(); }
+        if(fxEnabled && paySuccessSound) { paySuccessSound.stop(); paySuccessSound.play(); } 
+    };
+
+    document.getElementById('shopBtn').onclick = () => {
+        window.playClick();
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('shop-menu').style.display = 'flex';
+    };
+    document.getElementById('agentsBtn').onclick = () => {
+        window.playClick();
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('agents-menu').style.display = 'flex';
+    };
+
+    let chips = parseInt(localStorage.getItem(playerName + '_chips')) || 0;
+    let killCount = parseInt(localStorage.getItem(playerName + '_kills')) || 0;
+    let dmgLvl = parseInt(localStorage.getItem(playerName + '_dmgLvl')) || 0;
+    let hpLvl = parseInt(localStorage.getItem(playerName + '_hpLvl')) || 0;
+    let hasSpeaker = localStorage.getItem(playerName + '_hasSpeaker') === 'true';
+    let hasBig = localStorage.getItem(playerName + '_hasBig') === 'true';
+    let activeAgent = localStorage.getItem(playerName + '_activeAgent') || 'camera';
+    let usedPromos = JSON.parse(localStorage.getItem(playerName + '_usedPromos')) || {};
+    
+    let treeLevel = parseInt(localStorage.getItem(playerName + '_treeLevel')) || 1;
+    let treeHpLvl = parseInt(localStorage.getItem(playerName + '_treeHpLvl')) || 0;
+    let treeDmgLvl = parseInt(localStorage.getItem(playerName + '_treeDmgLvl')) || 0;
+    let treeColdLvl = parseInt(localStorage.getItem(playerName + '_treeColdLvl')) || 0;
+
+    let currentMaxHP = 10 + (hpLvl * 5) + (treeHpLvl * 5);
+    playerHP = currentMaxHP;
+
+    const BIN_ID = "6612dcbcad19ca34f855d0a6"; 
+    const API_KEY = "$2a$10$7Z2UjS9XqB3F9Wp.U0h5Xeu0I.jB3vM0D4R9A0F6l2a8K1M2N3O4P"; 
+
+    async function saveProgress() { 
+        if(!playerName) return; 
+        localStorage.setItem(playerName + '_chips', chips); 
+        localStorage.setItem(playerName + '_kills', killCount); 
+        localStorage.setItem(playerName + '_dmgLvl', dmgLvl); 
+        localStorage.setItem(playerName + '_hpLvl', hpLvl); 
+        localStorage.setItem(playerName + '_hasSpeaker', hasSpeaker); 
+        localStorage.setItem(playerName + '_hasBig', hasBig); 
+        localStorage.setItem(playerName + '_activeAgent', activeAgent); 
+        localStorage.setItem(playerName + '_usedPromos', JSON.stringify(usedPromos)); 
+        
+        localStorage.setItem(playerName + '_treeLevel', treeLevel);
+        localStorage.setItem(playerName + '_treeHpLvl', treeHpLvl);
+        localStorage.setItem(playerName + '_treeDmgLvl', treeDmgLvl);
+        localStorage.setItem(playerName + '_treeColdLvl', treeColdLvl);
+
+        let stats = JSON.parse(localStorage.getItem('players_stats') || '{}');
+        stats[playerName] = { chips, kills: killCount, level: treeLevel, hp: currentMaxHP, dmgLvl, hpLvl, treeHpLvl, treeDmgLvl, treeColdLvl };
+        localStorage.setItem('players_stats', JSON.stringify(stats));
+
+        try {
+            const getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                headers: { "X-Master-Key": API_KEY }
+            });
+            if (!getRes.ok) throw new Error();
+            const serverJson = await getRes.json();
+            const remoteStats = serverJson.record || {};
+            remoteStats[playerName] = stats[playerName];
+
+            await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY },
+                body: JSON.stringify(remoteStats)
+            });
+        } catch(e) { console.warn("Синхронизация пропущена"); }
+    }
+    
+    window.showLeaderboard = async () => {
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('leaderboard-menu').style.display = 'flex';
+        let list = document.getElementById('leaderboard-list');
+        list.innerHTML = "Загрузка...";
+
+        let stats = {};
+        try {
+            const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                headers: { "X-Master-Key": API_KEY }
+            });
+            if (response.ok) {
+                const serverJson = await response.json();
+                stats = serverJson.record || {};
+            } else {
+                stats = JSON.parse(localStorage.getItem('players_stats') || '{}');
+            }
+        } catch(e) {
+            stats = JSON.parse(localStorage.getItem('players_stats') || '{}');
+        }
+
+        if (playerName && stats) stats[playerName] = { chips, kills: killCount, level: treeLevel, hp: currentMaxHP, dmgLvl, hpLvl, treeHpLvl, treeDmgLvl, treeColdLvl };
+        
+        const sorted = Object.entries(stats || {}).sort((a, b) => (b[1].chips || 0) - (a[1].chips || 0)).slice(0, 5);
+        list.innerHTML = sorted.map(([name, s], i) => `
+            <div style="margin-bottom: 8px; border-bottom: 1px solid #555; padding-bottom: 5px;">
+                ${i+1}. <b style="color:#00ffcc;">${name}</b> ${name === playerName ? '<span style="color:yellow;">(ТЫ)</span>':''}<br>
+                <span style="font-size: 12px; color: #fff;">
+                Ур: ${s.level || 1} | ХП: ${s.hp || 10} | Чипы: ${s.chips || 0} | Убито: ${s.kills || 0}
+                </span>
+            </div>
+        `).join('') || "Данные отсутствуют.";
+    };
+
+    function updateTreeDisplay() {
+        document.getElementById('tree-chips').innerText = "Чипы: " + chips;
+        let lvlCost = treeLevel * 100;
+        document.getElementById('btn-tree-level').innerHTML = `УРОВЕНЬ ${treeLevel}<br>(${lvlCost})`;
+        let maxCap = treeLevel * 2; 
+        let hpCost = (treeHpLvl + 1) * 50;
+        let hpNode = document.getElementById('btn-tree-hp');
+        hpNode.innerHTML = `ХП: ${treeHpLvl}<br>(${treeHpLvl >= maxCap ? 'МАКС' : hpCost})`;
+        if (treeHpLvl >= maxCap) hpNode.classList.add('locked'); else hpNode.classList.remove('locked');
+        let dmgCost = (treeDmgLvl + 1) * 50;
+        let dmgNode = document.getElementById('btn-tree-dmg');
+        dmgNode.innerHTML = `УРОН: ${treeDmgLvl}<br>(${treeDmgLvl >= maxCap ? 'МАКС' : dmgCost})`;
+        if (treeDmgLvl >= maxCap) dmgNode.classList.add('locked'); else dmgNode.classList.remove('locked');
+        let coldCost = (treeColdLvl + 1) * 100;
+        let coldNode = document.getElementById('btn-tree-cold');
+        coldNode.innerHTML = `ХОЛОД: ${treeColdLvl}<br>(${treeColdLvl >= maxCap ? 'МАКС' : coldCost})`;
+        if (treeColdLvl >= maxCap) coldNode.classList.add('locked'); else coldNode.classList.remove('locked');
+    }
+
+    window.openTree = () => {
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('tree-menu').style.display = 'flex';
+        updateTreeDisplay();
+    };
+
+    window.upgradeTree = (type) => {
+        let maxCap = treeLevel * 2;
+        if (type === 'level') {
+            let cost = treeLevel * 100;
+            if (chips >= cost) { chips -= cost; treeLevel++; window.playPaySuccessSound(); } else { window.playErrorSound(); }
+        } else if (type === 'hp') {
+            let cost = (treeHpLvl + 1) * 50;
+            if (chips >= cost && treeHpLvl < maxCap) { chips -= cost; treeHpLvl++; currentMaxHP += 5; playerHP += 5; window.playPaySuccessSound(); } else { window.playErrorSound(); }
+        } else if (type === 'dmg') {
+            let cost = (treeDmgLvl + 1) * 50;
+            if (chips >= cost && treeDmgLvl < maxCap) { chips -= cost; treeDmgLvl++; window.playPaySuccessSound(); } else { window.playErrorSound(); }
+        } else if (type === 'cold') {
+            let cost = (treeColdLvl + 1) * 100;
+            if (chips >= cost && treeColdLvl < maxCap) { chips -= cost; treeColdLvl++; window.playPaySuccessSound(); } else { window.playErrorSound(); }
+        }
+        updateDisplay();
+        updateTreeDisplay();
+    };
+    
+    function updateDisplay() { 
+        document.getElementById('player-name-display').innerText = "Игрок: " + (playerName || "Гость");
+        document.getElementById('chips-display').innerText = "Чипы: " + chips; 
+        document.getElementById('menu-chips-display').innerText = "Чипы: " + chips;
+        document.getElementById('kill-display').innerText = "Убито: " + killCount; 
+        if (hasSpeaker) { document.getElementById('btn-speaker').style.display = 'block'; document.getElementById('buySpeakerBtn').style.display = 'none'; }
+        if (hasBig) { document.getElementById('btn-big').style.display = 'block'; document.getElementById('buyBigBtn').style.display = 'none'; }
+        updateAgentDisplay();
+        updateHUD();
+        saveProgress(); 
+    }
+    
+    window.buySpeaker = () => { 
+        if(chips >= 150) { chips -= 150; hasSpeaker = true; window.playPaySuccessSound(); updateDisplay(); } else { window.playErrorSound(); } 
+    };
+    window.buyBig = () => { 
+        if(chips >= 200) { chips -= 200; hasBig = true; window.playPaySuccessSound(); updateDisplay(); } else { window.playErrorSound(); } 
+    };
+    
+    window.applyPromo = () => {
+        let code = document.getElementById('promoInput').value.trim().toUpperCase();
+        if (code === 'SKIBIDI' && !usedPromos['SKIBIDI']) {
+            chips += 600; usedPromos['SKIBIDI'] = true; window.playPaySuccessSound(); updateDisplay(); alert('Бонус!');
+        } else { window.playErrorSound(); alert('Ошибка'); }
+    };
+    
+    window.setAgent = (type) => { 
+        activeAgent = type; 
+        const h = (type === 'big') ? 2.0 : (type === 'speaker' ? 1.5 : 1.25);
+        player.scale.set((type === 'big'? 3.5 : 2)/2, (type === 'big'? 3.5 : 2.5)/2.5, 1);
+        player.position.y = h;
+        updateDisplay(); 
+    };
+    
+    scene.add(new THREE.AmbientLight(0xffffff, 1));
+    listener = new THREE.AudioListener();
+    camera.add(listener);
+    
+    menuMusic = new THREE.Audio(listener);
+    audioLoader = new THREE.AudioLoader();
+    audioLoader.load('menu_sound.mp3', (buffer) => {
+        menuMusic.setBuffer(buffer); menuMusic.setLoop(true); menuMusic.setVolume(0.3);
+        if(musicEnabled) { try { menuMusic.play(); } catch(e){} }
+    });
+
+    clickSound = new THREE.Audio(listener);
+    audioLoader.load('button-click.mp3', (buffer) => {
+        clickSound.setBuffer(buffer);
+        clickSound.setVolume(0.5);
+    });
+
+    errorSound = new THREE.Audio(listener);
+    audioLoader.load('ohsibka.mp3', (buffer) => {
+        errorSound.setBuffer(buffer);
+        errorSound.setVolume(0.6);
+    });
+
+    paySuccessSound = new THREE.Audio(listener);
+    audioLoader.load('pay-true.mp3', (buffer) => {
+        paySuccessSound.setBuffer(buffer);
+        paySuccessSound.setVolume(0.6);
+    });
+
+    const createTex = (url, rx, ry) => { const t = getTex(url).clone(); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); return t; };
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshBasicMaterial({ map: createTex('grass.png', 20, 20), color: 0xffffff })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+    
+    wallData = [{x:0, z:50, w:100, d:2}, {x:0, z:-50, w:100, d:2}, {x:50, z:0, w:2, d:100}, {x:-50, z:0, w:2, d:100}];
+    wallData.forEach(b => { const wall = new THREE.Mesh(new THREE.BoxGeometry(b.w, 12, b.d), new THREE.MeshBasicMaterial({ map: createTex('walls.jpg', 20, 1), color: 0xffffff })); wall.position.set(b.x, 6, b.z); scene.add(wall); walls.push(new THREE.Box3().setFromObject(wall)); });
+
+    player = new THREE.Mesh(new THREE.PlaneGeometry(2, 2.5), new THREE.MeshBasicMaterial({ map: getTex('Kamera-Men.png'), color: 0xffffff, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide }));
+    window.setAgent(activeAgent); player.position.set(0, 1.25, 0); scene.add(player);
+
+    function spawnMedkit() { 
+        if(medkit) return; 
+        if(playerHP >= currentMaxHP) return; 
+        if(Math.random() < 0.3) { 
+            medkit = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), new THREE.MeshBasicMaterial({ map: getTex('aptechka.png'), color: 0xffffff, transparent: true, alphaTest: 0.5 })); 
+            medkit.position.set((Math.random()-0.5)*80, 1.5, (Math.random()-0.5)*80); 
+            scene.add(medkit); 
+        } 
+    }
+    
+    function spawnEnemy(count = 1) { 
+        if (enemies.length >= 6) return;
+        for(let i=0; i<count; i++) {
+            if (enemies.length >= 6) break;
+            let isUpg = Math.random() < 0.4; 
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 3.5), new THREE.MeshBasicMaterial({ map: getTex(isUpg ? 'Upg_Skibidi.png' : 'Skibidi.png'), color: 0xffffff, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide })); 
+            mesh.position.set((Math.random()-0.5)*80, 1.75, (Math.random()-0.5)*80); 
+            scene.add(mesh);
+            
+            const hpGroup = new THREE.Group();
+            const bg = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 0.3), new THREE.MeshBasicMaterial({color:0x333}));
+            const bar = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 0.3), new THREE.MeshBasicMaterial({color:0xff0000}));
+            bg.position.y = 2.5; bar.position.y = 2.5; bar.position.z = 0.01;
+            hpGroup.add(bg, bar); scene.add(hpGroup);
+
+            let scaleHp = (isUpg ? 5 : 3) + ((treeLevel - 1) * 2);
+            let scaleDmg = (isUpg ? 3 : 1) + (treeLevel - 1);
+
+            enemies.push({ mesh, hp: scaleHp, maxHp: scaleHp, hpGroup, bar, damage: scaleDmg, speed: 0.04 + Math.random() * 0.03, lastShot: performance.now(), shotDelay: 1000 + Math.random() * 2000, isUpg: isUpg, frozen: false }); 
+        }
+    }
+
+    window.startMode = () => { document.getElementById('mode-menu').style.display = 'none'; if(menuMusic.isPlaying) menuMusic.stop(); isPlaying = true; spawnEnemy(3); setInterval(() => { if(isPlaying && !isPaused) spawnEnemy(Math.random() < 0.3 ? 2 : 1); }, 8000); setInterval(spawnMedkit, 10000); };
+    window.triggerAttack = () => { 
+        if(attackCooldown || !isPlaying || isPaused) return; 
+        let totalDamage = (activeAgent === 'big' ? 2 : 1) + dmgLvl + treeDmgLvl;
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            let e = enemies[i];
+            if(e.mesh.position.distanceTo(player.position) < 5) { 
+                e.hp -= totalDamage; 
+                e.bar.scale.x = Math.max(0.001, e.hp / e.maxHp);
+                e.mesh.material.color.set(0xff0000);
+                if(e.hp <= 0) { scene.remove(e.mesh); scene.remove(e.hpGroup); enemies.splice(i, 1); chips += 10; killCount++; updateDisplay(); spawnEnemy(1); }
+                else {
+                    let freezeChance = treeColdLvl * 0.10;
+                    if (treeColdLvl > 0 && !e.frozen && Math.random() < freezeChance) { e.frozen = true; e.speed *= 0.5; }
+                    setTimeout(() => { if (e && e.mesh) e.mesh.material.color.set(e.frozen ? 0x00aaff : 0xffffff); }, 100);
+                }
+            } 
+        }
+        attackCooldown = true; attackCooldownTimer = 1.0;
+        let interval = setInterval(() => {
+            attackCooldownTimer -= 0.1;
+            if(attackCooldownTimer <= 0) { clearInterval(interval); attackCooldown = false; }
+        }, 100);
+    };
+
+    container.addEventListener('pointerdown', (e) => { 
+        if (e.target.id === 'attack-btn' || e.target.id === 'jump-btn' || e.target.id === 'joystick-area' || e.target.id === 'joystick-knob') return;
+        isMouseDown = true; camPointerId = e.pointerId; lastPointerX = e.clientX; lastPointerY = e.clientY; 
+    });
+    
+    function animate(time) {
+        requestAnimationFrame(animate); 
+        let menus = ['menu', 'game-over', 'pause-menu', 'shop-menu', 'agents-menu', 'enemies-info', 'reg-menu', 'settings-menu', 'mode-menu', 'login-menu', 'leaderboard-menu', 'tree-menu'];
+        if (menus.some(id => document.getElementById(id).style.display === 'flex')) return;
+        renderer.render(scene, camera);
+        if(!isPlaying || isPaused) return;
+        let targetY = (activeAgent === 'big') ? 2.0 : (activeAgent === 'speaker' ? 1.5 : 1.25);
+        velocityY -= 0.012; player.position.y += velocityY; if(player.position.y < targetY) { player.position.y = targetY; velocityY = 0; }
+        let moveX = joyX + (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+        let moveY = joyY + (keys.KeyS ? 1 : 0) - (keys.KeyW ? 1 : 0);
+        let isMoving = (Math.abs(moveX) > 0.1 || Math.abs(moveY) > 0.1);
+        let move = new THREE.Vector3(moveX * 0.2, 0, moveY * 0.2);
+        let moveWorld = move.applyAxisAngle(new THREE.Vector3(0,1,0), camRot.theta);
+        let nextPos = player.position.clone().add(moveWorld);
+        let playerBox = new THREE.Box3().setFromCenterAndSize(nextPos, new THREE.Vector3(1, 2.5, 1));
+        if(!walls.some(w => playerBox.intersectsBox(w))) player.position.copy(nextPos);
+        if (isMoving) { animTimer += 0.04; animFrame = 1 + (Math.floor(animTimer) % 2); } else { animFrame = 0; animTimer = 0; }
+        let spriteMap = { camera: ['Kamera-Men.png', 'Kamera-Left.png', 'Kamera-Right.png'], speaker: ['spiker.png', 'Spiker-Left.png', 'Spiker-Right.png'], big: ['big_cam.png', 'BigKam-Left.png', 'BigKam-Right.png'] };
+        player.material.map = getTex(spriteMap[activeAgent][animFrame]);
+        if(medkit && player.position.distanceTo(medkit.position) < 4.0) { scene.remove(medkit); medkit = null; playerHP = Math.min(currentMaxHP, playerHP + 3); updateHUD(); }
+        ctx.clearRect(0,0,150,150); ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(0,0,150,150); ctx.fillStyle = "gray";
+        wallData.forEach(w => { let mX = 75 + (w.x/100)*75, mY = 75 + (w.z/100)*75; let mW = (w.w/100)*75, mH = (w.d/100)*75; ctx.fillRect(mX - mW/2, mY - mH/2, mW, mH); });
+        ctx.fillStyle = "white"; ctx.save(); 
+        let pX = 75 + player.position.x/100*75, pY = 75 + player.position.z/100*75;
+        ctx.translate(pX, pY); ctx.rotate(-camRot.theta); ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(-4, 5); ctx.lineTo(4, 5); ctx.fill(); ctx.restore();
+        if(medkit) { ctx.fillStyle = "green"; ctx.fillRect(75 + medkit.position.x/100*75, 75 + medkit.position.z/100*75, 4, 4); }
+        ctx.fillStyle = "red";
+        enemies.forEach(e => {
+            e.mesh.lookAt(camera.position.x, e.mesh.position.y, camera.position.z);
+            e.hpGroup.position.copy(e.mesh.position).y += 1;
+            e.hpGroup.lookAt(camera.position);
+            ctx.fillRect(75 + e.mesh.position.x/100*75, 75 + e.mesh.position.z/100*75, 4, 4);
+            let dist = e.mesh.position.distanceTo(player.position);
+            if (dist < 20) {
+                let dir = player.position.clone().sub(e.mesh.position).normalize();
+                e.mesh.position.add(dir.multiplyScalar(e.speed));
+                if(dist > 5 && time - e.lastShot > e.shotDelay) { 
+                    let b = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({color: 0xff0000}));
+                    b.position.copy(e.mesh.position).y += 1.0; scene.add(b);
+                    bullets.push({mesh: b, dir: player.position.clone().sub(e.mesh.position).normalize(), created: time, damage: e.damage});
+                    e.lastShot = time;
+                }
+            }
+        });
+        for(let i = bullets.length - 1; i >= 0; i--) {
+            let b = bullets[i]; b.mesh.position.add(b.dir.clone().multiplyScalar(0.04));
+            if(b.mesh.position.distanceTo(player.position) < 1.5) { scene.remove(b.mesh); bullets.splice(i, 1); playerHP -= b.damage; updateHUD(); if(playerHP <= 0) { isPlaying = false; document.getElementById('game-over').style.display='flex'; } }
+            else if(time - b.created > 3000) { scene.remove(b.mesh); bullets.splice(i, 1); }
+        }
+        player.lookAt(camera.position.x, player.position.y, camera.position.z);
+        let cp = new THREE.Vector3(player.position.x + camDist*Math.sin(camRot.theta)*Math.cos(camRot.phi), player.position.y+2+camDist*Math.sin(camRot.phi), player.position.z + camDist*Math.cos(camRot.theta)*Math.cos(camRot.phi));
+        camera.position.lerp(cp, 0.2); camera.lookAt(player.position.x, player.position.y + 1, player.position.z);
+    }
+    animate(); updateDisplay();
+</script>
+</body>
+</html>
